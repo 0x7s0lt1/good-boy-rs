@@ -2,8 +2,9 @@ use minidom::Element;
 use regex::Regex;
 use url::Url;
 use crate::{LOC, SITEMAP, SITEMAP_INDEX, URLSET, XML_EXTENSION};
+use crate::crawler::crawl;
 
-pub async fn get_site_map(url: Url) -> Result<Vec<String>, reqwest::Error> {
+pub async fn get_site_map(url: &Url) -> Result<Vec<String>, reqwest::Error> {
     let robots_txt_uri = [url.as_str(), "robots.txt"].join("");
 
     let res = reqwest::get(robots_txt_uri).await?;
@@ -18,7 +19,7 @@ pub async fn get_site_map(url: Url) -> Result<Vec<String>, reqwest::Error> {
     Ok(parts)
 }
 
-pub async fn crawl_from_sitemap(sitemaps: &mut Vec<String>) {
+pub async fn crawl_from_sitemap(sitemaps: &mut Vec<String>){
     let _regex = Regex::new(r"(?i)sitemap:").unwrap();
 
     for map in sitemaps {
@@ -38,7 +39,7 @@ pub async fn handle_sitemap_entry(_sitemap_uri: &String) -> Result<(), reqwest::
     if root.name() == SITEMAP_INDEX {
         handle_sitemap_index(&root).await.unwrap();
     } else if root.name() == URLSET {
-        handle_sitemap(&root);
+        handle_sitemap(&root).await;
     }
 
     Ok(())
@@ -50,7 +51,7 @@ pub async fn handle_sitemap_index(root: &Element) -> Result<(), reqwest::Error> 
             for loc in child.children() {
                 if loc.name() == LOC {
                     let _root = get_sitemap_xml(&loc.text()).await.unwrap();
-                    handle_sitemap(&_root);
+                    handle_sitemap(&_root).await;
                 }
             }
         }
@@ -59,12 +60,11 @@ pub async fn handle_sitemap_index(root: &Element) -> Result<(), reqwest::Error> 
     Ok(())
 }
 
-pub fn handle_sitemap(root: &Element) {
+pub async fn handle_sitemap(root: &Element) {
     for child in root.children() {
         for loc in child.children() {
             if loc.name() == LOC {
-                //crawl(loc.text());
-                println!("{}", loc.text());
+                crawl(&loc.text()).await;
             }
         }
     }
