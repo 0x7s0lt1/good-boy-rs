@@ -1,9 +1,7 @@
-use crate::XML_EXTENSION;
-// use quick_xml::events::Event;
-// use quick_xml::reader::Reader;
-use crate::util::parse_xml_into_vector;
+use minidom::Element;
 use regex::Regex;
 use url::Url;
+use crate::{LOC, SITEMAP, SITEMAP_INDEX, URLSET, XML_EXTENSION};
 
 pub async fn get_site_map(url: Url) -> Result<Vec<String>, reqwest::Error> {
     let robots_txt_uri = [url.as_str(), "robots.txt"].join("");
@@ -28,51 +26,55 @@ pub async fn crawl_from_sitemap(sitemaps: &mut Vec<String>) {
         let _split: Vec<_> = _regex.split(_replaced.as_str()).collect();
 
         let _range = &_split[1].find(XML_EXTENSION).unwrap() + XML_EXTENSION.len();
-        let _sitemap_uri = &_split[1][0.._range].trim();
+        let _sitemap_uri = &_split[1][0.._range].trim().to_string();
 
-        handle_sitemap(_sitemap_uri).await.unwrap();
+        handle_sitemap_entry(_sitemap_uri).await.unwrap();
     }
 }
 
-pub async fn handle_sitemap(_sitemap_uri: &str) -> Result<String, reqwest::Error> {
+pub async fn handle_sitemap_entry(_sitemap_uri: &String) -> Result<(), reqwest::Error> {
+    let root = get_sitemap_xml(_sitemap_uri).await.unwrap();
 
-    let resp = reqwest::get(_sitemap_uri.to_string()).await?;
-    let xml = resp.text().await?;
+    if root.name() == SITEMAP_INDEX {
+        handle_sitemap_index(&root).await.unwrap();
+    } else if root.name() == URLSET {
+        handle_sitemap(&root);
+    }
 
-    let vector = parse_xml_into_vector(xml.as_str(), "sitemapindex");
-    println!("{:?}", vector);
-
-    // let mut reader = Reader::from_str(xml.as_str());
-    // reader.trim_text(true);
-    //
-    // let mut count = 0;
-    // let mut txt = Vec::new();
-    // let mut buf = Vec::new();
-    //
-    // loop {
-    //     match reader.read_event_into(&mut buf) {
-    //         Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-    //         Ok(Event::Eof) => break,
-    //         Ok(Event::Start(e)) => match e.name().as_ref() {
-    //             b"sitemapindex" => println!(
-    //                 "attributes values: {:?}",
-    //                 e.attributes().map(|a| a.unwrap().value).collect::<Vec<_>>()
-    //             ),
-    //             b"urlset" => count += 1,
-    //             _ => (),
-    //         },
-    //         Ok(Event::Text(e)) => txt.push(e.unescape().unwrap().into_owned()),
-    //
-    //         // There are several other `Event`s we do not consider here
-    //         _ => (),
-    //     }
-    //     // if we don't keep a borrow elsewhere, we can clear the buffer to keep memory usage low
-    //     buf.clear();
-    // }
-
-    Ok("ok".to_string())
+    Ok(())
 }
 
-// pub async fn crawl(path: String) -> usize {
-//     0
-// }
+pub async fn handle_sitemap_index(root: &Element) -> Result<(), reqwest::Error> {
+    for child in root.children() {
+        if child.name() == SITEMAP {
+            for loc in child.children() {
+                if loc.name() == LOC {
+                    let _root = get_sitemap_xml(&loc.text()).await.unwrap();
+                    handle_sitemap(&_root);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn handle_sitemap(root: &Element) {
+    for child in root.children() {
+        for loc in child.children() {
+            if loc.name() == LOC {
+                //crawl(loc.text());
+                println!("{}", loc.text());
+            }
+        }
+    }
+}
+
+async fn get_sitemap_xml(_sitemap_uri: &String) -> Result<Element, reqwest::Error> {
+    let resp = reqwest::get(_sitemap_uri).await?;
+    let xml = resp.text().await?;
+
+    let root: Element = xml.parse().unwrap();
+
+    Ok(root)
+}

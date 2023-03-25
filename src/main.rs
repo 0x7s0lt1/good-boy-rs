@@ -1,7 +1,7 @@
 #![deny(warnings)]
 
-use good_boy::sitemap::{crawl_from_sitemap, get_site_map};
 use url::Url;
+use good_boy::sitemap::{crawl_from_sitemap, get_site_map};
 
 #[tokio::main]
 async fn main() {
