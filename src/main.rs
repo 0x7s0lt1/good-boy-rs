@@ -1,9 +1,7 @@
 #![deny(warnings)]
 
+use good_boy::crawler::Crawler;
 use url::Url;
-use good_boy::{
-    crawler::{Crawler}
-};
 
 #[tokio::main]
 async fn main() {
@@ -35,10 +33,13 @@ async fn main() {
         return;
     }
 
+    let mut url_arg = args[0].clone();
+    if !url_arg.ends_with("/"){
+        url_arg = url_arg.to_owned() + "/";
+    }
 
-
-    let url = Url::parse(&args[0]).expect("Can't parse URL!");
-    let crawler = Crawler::new(url.clone());
+    let url = Url::parse(&url_arg).expect("Can't parse URL!");
+    let mut crawler = Crawler::new(url.clone());
 
     match Crawler::get_site_map(&url).await {
         Ok(mut _sitemap) => {
@@ -47,8 +48,7 @@ async fn main() {
         }
         Err(_) => {
             println!("No sitemap found!");
-            Crawler::crawl(&url.as_str());
+            crawler.crawl(&url.as_str()).await;
         }
     };
 }
-
