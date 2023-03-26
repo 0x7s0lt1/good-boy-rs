@@ -7,8 +7,10 @@ edition = "2021"
 
 [dependencies]
 
+sentry = "0.30.0"
 tokio = { version = "1.26.0", features = ["full"] }
 
+dotenv = "0.15.0"
 url = "2.3.1"
 regex = "1.7.2"
 minidom = "0.15.1"

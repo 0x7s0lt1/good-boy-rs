@@ -1,10 +1,26 @@
 #![deny(warnings)]
 
+use dotenv::dotenv;
 use good_boy::crawler::Crawler;
 use url::Url;
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
+    let _guard = sentry::init((
+        std::env::var("SENTRY_DSN").unwrap(),
+        sentry::ClientOptions {
+            release: sentry::release_name!(),
+            ..Default::default()
+        },
+    ));
+
+    let _sentry = sentry::init(sentry::ClientOptions {
+        release: sentry::release_name!(),
+        traces_sample_rate: 0.2,
+        ..Default::default()
+    });
+
     print!("\x1B[2J\x1B[1;1H");
 
     let args: Vec<String> = std::env::args().skip(1).collect();

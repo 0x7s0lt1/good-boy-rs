@@ -4,7 +4,7 @@ const XML_EXTENSION: &str = ".xml";
 const SITEMAP_INDEX: &str = "sitemapindex";
 const SITEMAP: &str = "sitemap";
 const URLSET: &str = "urlset";
-const LOC: &'static str = "loc";
+const LOC: &str = "loc";
 // const EMAIL_REGEX: Regex = Regex::new(r"\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b");
 // const VALID_EMAIL_REGEX: Regex = Regex::new(r"^\\w+([\\.-]?\\w+)*@\\w+([\\.-]?\\w+)*(\\.\\w{2,3})+$");
 

@@ -1,21 +1,23 @@
 use crate::{DISALLOWED_EXTENSIONS, LOC, MINUS_ONE, SITEMAP, SITEMAP_INDEX, URLSET, XML_EXTENSION};
 use minidom::Element;
 use regex::Regex;
-use reqwest::header::{HeaderMap, HeaderValue};
+//use reqwest::header::{HeaderMap, HeaderValue};
+use std::fs::OpenOptions;
+use std::io::prelude::*;
 use url::Url;
 
 pub struct Crawler {
     url: String,
-    url_regex: Regex,
-    headers: HeaderMap,
     seen: Vec<String>,
     found: Vec<String>,
+    url_regex: Regex,
+    email_regex: Regex,
 }
 
 impl Crawler {
     pub fn new(url: Url) -> Self {
-        let mut headers = HeaderMap::new();
-        headers.insert("User-Agent", HeaderValue::from_static("Good Boy"));
+        // let mut headers = HeaderMap::new();
+        // headers.insert("User-Agent", HeaderValue::from_static("Good Boy"));
 
         let regex_string = format!(
             "{}|{}",
@@ -26,10 +28,11 @@ impl Crawler {
 
         Self {
             url: url.to_string(),
-            url_regex,
-            headers,
             seen: Vec::new(),
             found: Vec::new(),
+            url_regex,
+            email_regex: Regex::new(r"\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b")
+                .unwrap(),
         }
     }
 
@@ -39,8 +42,24 @@ impl Crawler {
                 if !&self.seen.contains(&url) {
                     self.seen.push(url.to_string());
 
-                    let res = reqwest::get(&url.to_string()).await.unwrap();
-                    let _body = res.text().await.unwrap();
+                    let _res = reqwest::get(&url.to_string()).await.unwrap();
+                    let _body = _res.text().await.unwrap();
+
+                    self.email_regex
+                        .find_iter(&_body)
+                        .map(|e| e.as_str())
+                        .for_each(|email| {
+                            if !self.found.contains(&email.to_string()) {
+                                self.found.push(email.to_string());
+
+                                let mut file =
+                                    OpenOptions::new().append(true).open("emails.txt").unwrap();
+
+                                writeln!(file, "{}\r\n", email).expect("TODO: panic message");
+
+                                //fs::write("email.txt",format!("{}\r\n", _email).as_bytes())?;
+                            }
+                        });
 
                     println!("{}", url);
                 }
@@ -109,12 +128,20 @@ impl Crawler {
         &mut self,
         _sitemap_uri: &String,
     ) -> Result<(), reqwest::Error> {
-        let root = Self::get_sitemap_xml(_sitemap_uri).await.unwrap();
+        //let root = Self::get_sitemap_xml(_sitemap_uri).await.unwrap();
 
-        if root.name() == SITEMAP_INDEX {
-            self.handle_sitemap_index(&root).await.unwrap();
-        } else if root.name() == URLSET {
-            self.handle_sitemap(&root).await;
+        match Self::get_sitemap_xml(_sitemap_uri).await {
+            Ok(root) => {
+                if root.name() == SITEMAP_INDEX {
+                    self.handle_sitemap_index(&root).await.unwrap();
+                } else if root.name() == URLSET {
+                    self.handle_sitemap(&root).await;
+                }
+            }
+            Err(_) => {
+                //self.crawl(&mut self.url.as_str() );
+                println!("Damn!");
+            }
         }
 
         Ok(())
