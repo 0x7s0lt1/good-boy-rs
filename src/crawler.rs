@@ -1,4 +1,4 @@
-use crate::{LOC, SITEMAP, SITEMAP_INDEX, URLSET, XML_EXTENSION, DISALLOWED_EXTENSIONS,MINUS_ONE};
+use crate::{DISALLOWED_EXTENSIONS, LOC, MINUS_ONE, SITEMAP, SITEMAP_INDEX, URLSET, XML_EXTENSION};
 use minidom::Element;
 use regex::Regex;
 use reqwest::header::{HeaderMap, HeaderValue};
@@ -17,8 +17,12 @@ impl Crawler {
         let mut headers = HeaderMap::new();
         headers.insert("User-Agent", HeaderValue::from_static("Good Boy"));
 
-        let regex_string = format!("{}|{}",url.clone().host_str().unwrap(),url.clone().as_str().replace("www.",""));
-        let url_regex = Regex::new(regex_string.as_str() ).unwrap();
+        let regex_string = format!(
+            "{}|{}",
+            url.host_str().unwrap(),
+            url.as_str().replace("www.", "")
+        );
+        let url_regex = Regex::new(regex_string.as_str()).unwrap();
 
         Self {
             url: url.to_string(),
@@ -29,51 +33,47 @@ impl Crawler {
         }
     }
 
-    pub async fn crawl(&mut self,url: &str) {
-
-        match self.format_url(&url){
+    pub async fn crawl(&mut self, url: &str) {
+        match self.format_url(url) {
             Ok(url) => {
-
                 if !&self.seen.contains(&url) {
-                    &self.seen.push(url.to_string());
+                    self.seen.push(url.to_string());
 
                     let res = reqwest::get(&url.to_string()).await.unwrap();
-                    let body = res.text().await.unwrap();
+                    let _body = res.text().await.unwrap();
 
                     println!("{}", url);
-
                 }
             }
             Err(err) => {
                 println!("{}", err);
             }
         }
-
     }
 
     fn format_url(&self, url: &str) -> Result<String, &str> {
-
-
-        if DISALLOWED_EXTENSIONS.iter().any(|ext|{ url.ends_with(ext)}) {
-           return  Err("Extension not supported!")
+        if DISALLOWED_EXTENSIONS.iter().any(|ext| url.ends_with(ext)) {
+            return Err("Extension not supported!");
         }
 
         if url.starts_with("http://") || url.starts_with("https://") {
             if self.url_regex.find_iter(url).count() as i32 > MINUS_ONE {
-                return Ok(url.to_string())
+                return Ok(url.to_string());
             }
-            return Err("URL is pointing to far!")
+            return Err("URL is pointing to far!");
         }
 
-        if url.starts_with("./") { return Ok(url.replace("./", "")) }
-        if url.starts_with("../") { return Ok(url.replace("../", "")) }
-        if !url.starts_with("/"){
-
-            return Ok(format!("{}/{}", self.url, url))
+        if url.starts_with("./") {
+            return Ok(url.replace("./", ""));
+        }
+        if url.starts_with("../") {
+            return Ok(url.replace("../", ""));
+        }
+        if !url.starts_with('/') {
+            return Ok(format!("{}/{}", self.url, url));
         }
 
         Ok(format!("{}{}", self.url, url))
-
     }
 
     pub async fn get_site_map(url: &Url) -> Result<Vec<String>, reqwest::Error> {
@@ -98,14 +98,17 @@ impl Crawler {
             let _replaced = map.replace('\r', "");
             let _split: Vec<_> = _regex.split(_replaced.as_str()).collect();
 
-            let _range = &_split[1].find(XML_EXTENSION).unwrap() + XML_EXTENSION.len();
+            let _range = _split[1].find(XML_EXTENSION).unwrap() + XML_EXTENSION.len();
             let _sitemap_uri = &_split[1][0.._range].trim().to_string();
 
             self.handle_sitemap_entry(_sitemap_uri).await.unwrap();
         }
     }
 
-    pub async fn handle_sitemap_entry(&mut self, _sitemap_uri: &String) -> Result<(), reqwest::Error> {
+    pub async fn handle_sitemap_entry(
+        &mut self,
+        _sitemap_uri: &String,
+    ) -> Result<(), reqwest::Error> {
         let root = Self::get_sitemap_xml(_sitemap_uri).await.unwrap();
 
         if root.name() == SITEMAP_INDEX {

@@ -34,7 +34,7 @@ async fn main() {
     }
 
     let mut url_arg = args[0].clone();
-    if !url_arg.ends_with("/"){
+    if !url_arg.ends_with('/') {
         url_arg = url_arg.to_owned() + "/";
     }
 
@@ -48,7 +48,7 @@ async fn main() {
         }
         Err(_) => {
             println!("No sitemap found!");
-            crawler.crawl(&url.as_str()).await;
+            crawler.crawl(url.as_str()).await;
         }
     };
 }
