@@ -1,4 +1,3 @@
-pub mod sitemap;
 pub mod util;
 pub mod crawler;
 

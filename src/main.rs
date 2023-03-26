@@ -1,11 +1,8 @@
 #![deny(warnings)]
 
 use url::Url;
-//use regex::Regex;
-use reqwest::header::{HeaderMap, HeaderValue};
 use good_boy::{
-    sitemap::{crawl_from_sitemap, get_site_map},
-    crawler::{crawl}
+    crawler::{Crawler}
 };
 
 #[tokio::main]
@@ -38,23 +35,19 @@ async fn main() {
         return;
     }
 
-    let mut headers = HeaderMap::new();
-    headers.insert("User-Agent", HeaderValue::from_static("Good Boy"));
+
 
     let url = Url::parse(&args[0]).expect("Can't parse URL!");
-    // let url_regex = Regex::new(&url.host().unwrap() + "|" + &url.as_str().replace("www.", "")).unwrap();
-    //
-    // let mut seen : Vec<String> = Vec::new();
-    // let mut found: Vec<String> = Vec::new();
+    let crawler = Crawler::new(url.clone());
 
-    match get_site_map(&url).await {
+    match Crawler::get_site_map(&url).await {
         Ok(mut _sitemap) => {
             println!("Sitemap found!");
-            crawl_from_sitemap(&mut _sitemap).await;
+            crawler.crawl_from_sitemap(&mut _sitemap).await;
         }
         Err(_) => {
             println!("No sitemap found!");
-            crawl(&url.as_str()).await;
+            Crawler::crawl(&url.as_str());
         }
     };
 }
