@@ -1,43 +1,39 @@
 use crate::{DISALLOWED_EXTENSIONS, LOC, MINUS_ONE, SITEMAP, SITEMAP_INDEX, URLSET, XML_EXTENSION};
 use minidom::Element;
 use regex::Regex;
-//use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::header::{HeaderMap, HeaderValue};
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use url::Url;
 
 pub struct Crawler {
-    url: String,
+    pub url: Url,
     seen: Vec<String>,
     found: Vec<String>,
     url_regex: Regex,
+    headers: HeaderMap,
     email_regex: Regex,
 }
 
 impl Crawler {
     pub fn new(url: Url) -> Self {
-        // let mut headers = HeaderMap::new();
-        // headers.insert("User-Agent", HeaderValue::from_static("Good Boy"));
 
-        let regex_string = format!(
+        let url_regex_string = format!(
             "{}|{}",
             url.host_str().unwrap(),
             url.as_str().replace("www.", "")
         );
-        let url_regex = Regex::new(regex_string.as_str()).unwrap();
+        let url_regex = Regex::new(url_regex_string.as_str()).unwrap();
 
         Self {
-            url: url.to_string(),
-            seen: Vec::new(),
-            found: Vec::new(),
+            url,
             url_regex,
-            email_regex: Regex::new(r"\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b")
-                .unwrap(),
+            ..Default::default()
         }
     }
 
-    pub async fn crawl(&mut self, url: &str) {
-        match self.format_url(url) {
+    pub async fn crawl(&mut self, url: Option<&str>) {
+        match self.format_url(url.unwrap_or(self.url.as_str() ) ) {
             Ok(url) => {
                 if !&self.seen.contains(&url) {
                     self.seen.push(url.to_string());
@@ -57,7 +53,6 @@ impl Crawler {
 
                                 writeln!(file, "{}\r\n", email).expect("TODO: panic message");
 
-                                //fs::write("email.txt",format!("{}\r\n", _email).as_bytes())?;
                             }
                         });
 
@@ -95,11 +90,11 @@ impl Crawler {
         Ok(format!("{}{}", self.url, url))
     }
 
-    pub async fn get_site_map(url: &Url) -> Result<Vec<String>, reqwest::Error> {
-        let robots_txt_uri = [url.as_str(), "robots.txt"].join("");
+    pub async fn get_site_map(&self) -> Result<Vec<String>, ()> {
+        let robots_txt_uri = [self.url.as_str(), "robots.txt"].join("");
 
-        let res = reqwest::get(robots_txt_uri).await?;
-        let body = res.text().await?;
+        let res = reqwest::get(robots_txt_uri).await.unwrap();
+        let body = res.text().await.unwrap();
 
         let parts: Vec<String> = body
             .split('\n')
@@ -107,12 +102,14 @@ impl Crawler {
             .filter(|part| part.trim().starts_with("Sitemap") || part.trim().starts_with("sitemap"))
             .collect();
 
-        Ok(parts)
+        if parts.len() > 0 { Ok(parts) } else { Err(()) }
+
     }
 
-    pub async fn crawl_from_sitemap(&mut self, sitemaps: &mut Vec<String>) {
+    pub async fn crawl_from_sitemap(&mut self, sitemaps: Vec<String>) {
         let _regex = Regex::new(r"(?i)sitemap:").unwrap();
 
+        println!("{:?}", sitemaps);
         for map in sitemaps {
             let _replaced = map.replace('\r', "");
             let _split: Vec<_> = _regex.split(_replaced.as_str()).collect();
@@ -128,7 +125,6 @@ impl Crawler {
         &mut self,
         _sitemap_uri: &String,
     ) -> Result<(), reqwest::Error> {
-        //let root = Self::get_sitemap_xml(_sitemap_uri).await.unwrap();
 
         match Self::get_sitemap_xml(_sitemap_uri).await {
             Ok(root) => {
@@ -139,8 +135,7 @@ impl Crawler {
                 }
             }
             Err(_) => {
-                //self.crawl(&mut self.url.as_str() );
-                println!("Damn!");
+                self.crawl(None).await;
             }
         }
 
@@ -166,7 +161,7 @@ impl Crawler {
         for child in root.children() {
             for loc in child.children() {
                 if loc.name() == LOC {
-                    self.crawl(&loc.text()).await;
+                    self.crawl(Some(&loc.text()) ).await;
                 }
             }
         }
@@ -179,5 +174,24 @@ impl Crawler {
         let root: Element = xml.parse().unwrap();
 
         Ok(root)
+    }
+
+}
+
+impl Default for Crawler {
+    fn default() -> Self {
+
+        let mut headers = HeaderMap::new();
+        headers.insert("User-Agent", HeaderValue::from_static("Good Boy"));
+
+        Self {
+            url: Url::parse("https://github.com/zsoltfehervari/good-boy-rs").unwrap(),
+            headers,
+            seen : Vec::new(),
+            found: Vec::new(),
+            url_regex: Regex::new("").unwrap(),
+            email_regex: Regex::new(r"\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b")
+                .unwrap(),
+        }
     }
 }
